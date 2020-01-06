@@ -128,8 +128,8 @@ abstract class MangaBox (
             }
             description = document.select(descriptionSelector)?.first()?.ownText()
                 ?.replace("""^$title summary:\s""".toRegex(), "")
-                ?.replace("""<\s*br\s*\/?>""".toRegex(), "\n")
-                ?.replace("<[^>]*>".toRegex(), "")
+                ?.replace(HTML_BR_REGEX, "\n")
+                ?.replace(HTML_ALL_REGEX, "")
             thumbnail_url = document.select(thumbnailSelector).attr("abs:src")
         }
     }
@@ -211,16 +211,8 @@ abstract class MangaBox (
     // Based on change_alias JS function from Mangakakalot's website
     open fun normalizeSearchQuery(query: String): String {
         var str = query.toLowerCase()
-        str = str.replace("à|á|ạ|ả|ã|â|ầ|ấ|ậ|ẩ|ẫ|ă|ằ|ắ|ặ|ẳ|ẵ".toRegex(), "a")
-        str = str.replace("è|é|ẹ|ẻ|ẽ|ê|ề|ế|ệ|ể|ễ".toRegex(), "e")
-        str = str.replace("ì|í|ị|ỉ|ĩ".toRegex(), "i")
-        str = str.replace("ò|ó|ọ|ỏ|õ|ô|ồ|ố|ộ|ổ|ỗ|ơ|ờ|ớ|ợ|ở|ỡ".toRegex(), "o")
-        str = str.replace("ù|ú|ụ|ủ|ũ|ư|ừ|ứ|ự|ử|ữ".toRegex(), "u")
-        str = str.replace("ỳ|ý|ỵ|ỷ|ỹ".toRegex(), "y")
-        str = str.replace("đ".toRegex(), "d")
-        str = str.replace("""!|@|%|\^|\*|\(|\)|\+|=|<|>|\?|/|,|\.|:|;|'| |"|&|#|\[|]|~|-|$|_""".toRegex(), "_")
-        str = str.replace("_+_".toRegex(), "_")
-        str = str.replace("""^_+|_+$""".toRegex(), "")
+        for (pair in NORMALIZE_QUERY_LIST)
+            str = str.replace(pair.first, pair.second)
         return str
     }
 
@@ -232,20 +224,48 @@ abstract class MangaBox (
             GenreFilter()
     )
 
-    private class SortFilter : UriPartFilter("Sort", arrayOf(
+    private class SortFilter : UriPartFilter("Sort", SORT_LIST)
+
+    private class StatusFilter : UriPartFilter("Status", STATUS_LIST)
+
+    private class GenreFilter : UriPartFilter("Category", GENRE_LIST)
+
+    private open class UriPartFilter(displayName: String, val vals: Array<Pair<String, String>>) :
+        Filter.Select<String>(displayName, vals.map { it.second }.toTypedArray()) {
+        fun toUriPart() = vals[state].first
+    }
+
+    companion object {
+        private val HTML_BR_REGEX = """<\s*br\s*/?>""".toRegex()
+        private val HTML_ALL_REGEX = "<[^>]*>".toRegex()
+
+        private val NORMALIZE_QUERY_LIST = arrayOf(
+            Pair("[àáạảãâầấậẩẫăằắặẳẵ]".toRegex(), "a"),
+            Pair("[èéẹẻẽêềếệểễ]".toRegex(), "e"),
+            Pair("[ìíịỉĩ]".toRegex(), "i"),
+            Pair("[òóọỏõôồốộổỗơờớợởỡ]".toRegex(), "o"),
+            Pair("[ùúụủũưừứựửữ]".toRegex(), "u"),
+            Pair("[ỳýỵỷỹ]".toRegex(), "y"),
+            Pair("đ".toRegex(), "d"),
+            Pair("""[!@%^*()+=<>?/,.:;' "&#\[\]~\-${'$'}_]""".toRegex(), "_"),
+            Pair("_+_".toRegex(), "_"),
+            Pair("""^_+|_+$""".toRegex(), "")
+        )
+
+        private val SORT_LIST = arrayOf(
             Pair("latest", "Latest"),
             Pair("newest", "Newest"),
             Pair("topview", "Top read")
-    ))
+        )
 
-    private class StatusFilter : UriPartFilter("Status", arrayOf(
+        private val STATUS_LIST = arrayOf(
             Pair("all", "ALL"),
             Pair("completed", "Completed"),
             Pair("ongoing", "Ongoing"),
             Pair("drop", "Dropped")
-    ))
+        )
 
-    private class GenreFilter : UriPartFilter("Category", arrayOf(
+        private val GENRE_LIST = arrayOf(
             Pair("all", "ALL"),
             Pair("2", "Action"),
             Pair("3", "Adult"),
@@ -287,10 +307,6 @@ abstract class MangaBox (
             Pair("40", "Webtoons"),
             Pair("41", "Yaoi"),
             Pair("42", "Yuri")
-    ))
-
-    private open class UriPartFilter(displayName: String, val vals: Array<Pair<String, String>>) :
-        Filter.Select<String>(displayName, vals.map { it.second }.toTypedArray()) {
-        fun toUriPart() = vals[state].first
+        )
     }
 }
