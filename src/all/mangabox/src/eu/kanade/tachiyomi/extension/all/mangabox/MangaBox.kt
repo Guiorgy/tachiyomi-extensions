@@ -1,6 +1,11 @@
 package eu.kanade.tachiyomi.extension.all.mangabox
 
+import android.app.Application
+import android.content.SharedPreferences
+import android.support.v7.preference.ListPreference
+import android.support.v7.preference.PreferenceScreen
 import eu.kanade.tachiyomi.network.GET
+import eu.kanade.tachiyomi.source.ConfigurableSource
 import eu.kanade.tachiyomi.source.model.Filter
 import eu.kanade.tachiyomi.source.model.FilterList
 import eu.kanade.tachiyomi.source.model.Page
@@ -12,6 +17,8 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import org.jsoup.nodes.Document
 import org.jsoup.nodes.Element
+import uy.kohesive.injekt.Injekt
+import uy.kohesive.injekt.api.get
 import java.text.ParseException
 import java.text.SimpleDateFormat
 import java.util.Calendar
@@ -25,7 +32,7 @@ abstract class MangaBox (
     override val baseUrl: String,
     override val lang: String,
     private val dateformat: SimpleDateFormat = SimpleDateFormat("MMM-dd-yy", Locale.ENGLISH)
-) : ParsedHttpSource() {
+) : ConfigurableSource, ParsedHttpSource() {
 
     override val supportsLatest = true
 
@@ -235,9 +242,57 @@ abstract class MangaBox (
         fun toUriPart() = vals[state].first
     }
 
+    private val preferences: SharedPreferences by lazy {
+        Injekt.get<Application>().getSharedPreferences("source_$id", 0x0000)
+    }
+
+    override fun setupPreferenceScreen(screen: androidx.preference.PreferenceScreen) {
+        val pref = androidx.preference.ListPreference(screen.context).apply {
+            key = PREF_KEY
+            title = PREF_TITLE
+            entries = PREF_ENTRIES
+            entryValues = PREF_ENTRY_VALUES
+            summary = "%s"
+
+            setOnPreferenceChangeListener { _, newValue ->
+                val selected = newValue as String
+                val index = this.findIndexOfValue(selected)
+                val entry = entryValues[index] as String
+                preferences.edit().putString(PREF, entry).commit()
+            }
+        }
+
+        screen.addPreference(pref)
+    }
+
+    override fun setupPreferenceScreen(screen: PreferenceScreen) {
+        val pref = ListPreference(screen.context).apply {
+            key = PREF_KEY
+            title = PREF_TITLE
+            entries = PREF_ENTRIES
+            entryValues = PREF_ENTRY_VALUES
+            summary = "%s"
+
+            setOnPreferenceChangeListener { _, newValue ->
+                val selected = newValue as String
+                val index = this.findIndexOfValue(selected)
+                val entry = entryValues[index] as String
+                preferences.edit().putString(PREF, entry).commit()
+            }
+        }
+
+        screen.addPreference(pref)
+    }
+
     companion object {
         private val HTML_BR_REGEX = """<\s*br\s*/?>""".toRegex()
         private val HTML_ALL_REGEX = "<[^>]*>".toRegex()
+
+        private const val PREF_KEY = "Source Enabled/Disabled"
+        private const val PREF_TITLE = "Source"
+        private val PREF_ENTRIES = arrayOf("Enabled", "Disabled")
+        private val PREF_ENTRY_VALUES = arrayOf("0", "1")
+        private const val PREF = "sourceEnabledDefault"
 
         private val NORMALIZE_QUERY_LIST = arrayOf(
             Pair("[àáạảãâầấậẩẫăằắặẳẵ]".toRegex(), "a"),
